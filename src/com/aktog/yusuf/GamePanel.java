@@ -5,19 +5,22 @@ import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
 
 public class GamePanel extends JPanel implements KeyListener {
-    public static final int PANEL_WIDTH = Cell.SIZE * (5 + 1);
-    public static final int PANEL_HEIGHT = Cell.SIZE * (5 + 1);
-    public static final int BOARD_SIZE = 5;
-    int i, j = 0;
-    private final Cell[][] gameBoard;
 
-    String chosenWord = chooseRandomWord();
+    public static final int SPACE_BETWEEN = 10; // space between cells
+    public static final int BOARD_SIZE = 5; // 5x5 grid
+
+    //Auto calculated frame width and frame length
+    public static final int PANEL_WIDTH = Cell.SIZE * (5 + 1) + SPACE_BETWEEN * (BOARD_SIZE - 1);
+    public static final int PANEL_HEIGHT = Cell.SIZE * (5 + 1) + SPACE_BETWEEN * (BOARD_SIZE - 1);
+
+    private final Cell[][] gameBoard;
+    int i, j = 0;
+
+    String chosenWord;
     String guess;
     int round = 1;
 
@@ -26,20 +29,22 @@ public class GamePanel extends JPanel implements KeyListener {
         initGameBoard();
         loadPreferences();
         this.addKeyListener(this);
+        chosenWord = chooseRandomWord();
+        System.out.println(chosenWord);
     }
 
     public void initGameBoard() {
         int x = Cell.SIZE / 2;
         int y = Cell.SIZE / 2;
-        int letterIndex = 65;
+
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
-                Cell cell = new Cell(x, y, Color.cyan, "");
+                Cell cell = new Cell(x, y, Color.gray, "");
                 gameBoard[i][j] = cell;
-                x += Cell.SIZE;
-                letterIndex++;
+                x += Cell.SIZE + 5;
+
             }
-            y += Cell.SIZE;
+            y += Cell.SIZE + 5;
             x = Cell.SIZE / 2;
         }
     }
@@ -54,19 +59,27 @@ public class GamePanel extends JPanel implements KeyListener {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(Color.red);
 
         Font font = new Font("", Font.BOLD, 50);
-
+        int rowCount = 1;
         for (Cell[] row : gameBoard) {
             for (Cell cell : row) {
                 g.setColor(cell.getColor());
                 g.setFont(font);
 
-                g.drawRect(cell.getX(), cell.getY(), Cell.SIZE, Cell.SIZE);
+                if (rowCount < round) {
+                    g.fillRect(cell.getX(), cell.getY(), Cell.SIZE, Cell.SIZE);
+                } else {
+                    g.drawRect(cell.getX(), cell.getY(), Cell.SIZE, Cell.SIZE);
+                }
 
-                g.drawString(cell.getLetter(), cell.getX() + Cell.SIZE / 2 - font.getSize() / 3, cell.getY() + Cell.SIZE / 2 + font.getSize() / 3);
+
+                g.setColor(new Color(200, 200, 200));
+                g.drawString(cell.getLetter(),
+                        cell.getX() + Cell.SIZE / 2 - font.getSize() / 3,
+                        cell.getY() + Cell.SIZE / 2 + font.getSize() / 3);
             }
+            rowCount++;
         }
     }
 
@@ -83,22 +96,32 @@ public class GamePanel extends JPanel implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
+        if (e.getKeyCode() == 8) {
+            deleteLastCell();
+            repaint();
+            return;
+        }
 
         if (!isValidExtendedKeyKode(e.getExtendedKeyCode()))
             return;
+
         gameBoard[i][j].setLetter(String.valueOf(e.getKeyChar()).toUpperCase());
         repaint();
         j++;
+        // End of the round, automatically check the guess and start to a new round
         if (j == 5) {
             i++;
             j = 0;
-            String guess = retrieveGuess(round);
-            System.out.printf("guess: %s", guess);
+            guess = retrieveGuess();
+            System.out.printf("guess: %s\n", guess);
+
             if (!isInWordList(guess)) {
-                resetValues();
+                rollBackRound();
             } else {
+                checkGuess();
                 round++;
             }
+
         }
     }
 
@@ -108,7 +131,7 @@ public class GamePanel extends JPanel implements KeyListener {
     }
 
     public boolean isValidExtendedKeyKode(int keyCode) {
-        System.out.println(keyCode);
+        // check for special turkish characters
         if (keyCode == 16777503) // ğ
             return true;
         if (keyCode == 16777468) // ü
@@ -125,32 +148,79 @@ public class GamePanel extends JPanel implements KeyListener {
             return false;
         if (keyCode == 88) // X
             return false;
-        if (keyCode >= 65 && keyCode <= 90)
-            return true;
-        return false;
 
+        return keyCode >= 65 && keyCode <= 90;
+
+    }
+
+    public void deleteLastCell() {
+        gameBoard[i][j - 1].setLetter("");
+        j--;
     }
 
     public boolean isInWordList(String word) {
         return FileHandler.readFrom("words.txt").contains(reFormatString(word));
     }
 
-    public String retrieveGuess(int round) {
+    public String retrieveGuess() {
         StringBuilder guess = new StringBuilder();
-        for (int k = 0; k < round; k++) {
-            for (int l = 0; l < BOARD_SIZE; l++) {
-                guess.append(gameBoard[k][l].getLetter());
-            }
+        for (int l = 0; l < BOARD_SIZE; l++) {
+            guess.append(gameBoard[round - 1][l].getLetter());
         }
+
         return guess.toString();
     }
 
-    public void resetValues() {
-        i = 0;
-        j = 0;
+    public void rollBackRound() {
+        for (int k = BOARD_SIZE - 1; k >= 0; k--) {
+            gameBoard[i - 1][k].setLetter("");
+        }
+        i--;
     }
 
-    public String reFormatString(String guess) { // Make the first Letter upper, the rest lower
-        return guess.charAt(0) + guess.substring(1, guess.length()).toLowerCase();
+    // Make the first Letter upper, the rest lower.
+    public String reFormatString(String guess) {
+        return guess.charAt(0) + guess.substring(1).toLowerCase();
+    }
+
+    public void checkGuess() {
+        Status status;
+        for (int k = 0; k < BOARD_SIZE; k++) {
+            status = checkCharacter(guess.charAt(k), k);
+            adjustCellColor(status, round - 1, k);
+            repaint();
+        }
+    }
+
+    public Status checkCharacter(Character ch, Integer index) {
+
+        // convert everything to uppercase to do a correct comparison
+        chosenWord = chosenWord.toUpperCase();
+        ch = Character.toUpperCase(ch);
+
+        if (chosenWord.charAt(index) == ch) {
+
+            return Status.SUCCESS_GUESS;
+        } else if (chosenWord.charAt(index) != ch && chosenWord.contains(ch.toString())) {
+
+            return Status.WRONG_PLACE;
+        } else {
+
+            return Status.FAIL;
+        }
+    }
+
+    public void adjustCellColor(Status status, int i, int j) {
+        switch (status) {
+            case SUCCESS_GUESS:
+                gameBoard[i][j].setColor(Color.green);
+                break;
+            case WRONG_PLACE:
+                gameBoard[i][j].setColor(Color.yellow);
+                break;
+            case FAIL:
+                gameBoard[i][j].setColor(Color.gray);
+                break;
+        }
     }
 }
