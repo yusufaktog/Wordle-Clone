@@ -1,14 +1,16 @@
 package com.aktog.yusuf;
 
 import java.awt.*;
+import java.util.Locale;
 
 public class Cell {
     private int x;
     private int y;
     private Color color;
-    private Character letter;
+    private String letter;
     public static final int SIZE = 125;
-    public Cell(int x, int y, Color color, Character letter) {
+
+    public Cell(int x, int y, Color color, String letter) {
         this.x = x;
         this.y = y;
         this.color = color;
@@ -39,11 +41,11 @@ public class Cell {
         this.color = color;
     }
 
-    public Character getLetter() {
+    public String getLetter() {
         return letter;
     }
 
-    public void setLetter(Character letter) {
+    public void setLetter(String letter) {
         this.letter = letter;
     }
 }
