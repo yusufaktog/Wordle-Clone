@@ -1,6 +1,8 @@
 package com.aktog.yusuf;
 
 import javax.swing.*;
+import javax.swing.plaf.IconUIResource;
+import javax.swing.plaf.basic.BasicIconFactory;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -21,7 +23,8 @@ public class GamePanel extends JPanel implements KeyListener {
     int i, j = 0;
 
     String chosenWord;
-    String guess;
+    String guess ;
+    Boolean backSpaceUsed = false;
     int round = 1;
 
     public GamePanel() {
@@ -31,6 +34,7 @@ public class GamePanel extends JPanel implements KeyListener {
         this.addKeyListener(this);
         chosenWord = chooseRandomWord();
         System.out.println(chosenWord);
+
     }
 
     public void initGameBoard() {
@@ -73,13 +77,19 @@ public class GamePanel extends JPanel implements KeyListener {
                     g.drawRect(cell.getX(), cell.getY(), Cell.SIZE, Cell.SIZE);
                 }
 
-
                 g.setColor(new Color(200, 200, 200));
                 g.drawString(cell.getLetter(),
                         cell.getX() + Cell.SIZE / 2 - font.getSize() / 3,
                         cell.getY() + Cell.SIZE / 2 + font.getSize() / 3);
             }
             rowCount++;
+        }
+        if (j == 0 && i != 0 && !backSpaceUsed && !isInWordList(guess)) {
+
+            g.setColor(Color.red);
+            g.setFont(font.deriveFont(Font.BOLD, 25));
+            g.drawString("NOT IN THE WORD LIST: " + guess, PANEL_WIDTH / 2 - font.getSize() * 4, PANEL_HEIGHT - 40);
+
         }
     }
 
@@ -96,7 +106,11 @@ public class GamePanel extends JPanel implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
+
         if (e.getKeyCode() == 8) {
+            if(j == 0)
+                return;
+            backSpaceUsed = true;
             deleteLastCell();
             repaint();
             return;
@@ -121,9 +135,46 @@ public class GamePanel extends JPanel implements KeyListener {
                 checkGuess();
                 round++;
             }
+            backSpaceUsed = false;
+            if (gameOver()) {
+                switch (showOptions()) {
+                    case 0:
+                        newGame();
+                        break;
+                    case 1:
+                        System.exit(0);
+                        break;
 
+                }
+
+            }
         }
     }
+
+    public void newGame() {
+        chosenWord = chooseRandomWord();
+        System.out.println(chosenWord);
+        guess = "";
+        i = 0;
+        j = 0;
+        round = 1;
+        backSpaceUsed = false;
+        initGameBoard();
+        repaint();
+    }
+
+    public int showOptions() {
+        return JOptionPane.showOptionDialog(
+                this,
+                "Game Over!",
+                "Title",
+                JOptionPane.YES_NO_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                BasicIconFactory.createEmptyFrameIcon(),
+                new String[]{"New Game", "Exit"},
+                0);
+    }
+
 
     @Override
     public void keyReleased(KeyEvent e) {
@@ -144,11 +195,12 @@ public class GamePanel extends JPanel implements KeyListener {
             return true;
         if (keyCode == 16777521) // ı
             return true;
+        //check for non-turkish characters
         if (keyCode == 81) // Q
             return false;
         if (keyCode == 88) // X
             return false;
-
+        // A-Z
         return keyCode >= 65 && keyCode <= 90;
 
     }
@@ -222,5 +274,9 @@ public class GamePanel extends JPanel implements KeyListener {
                 gameBoard[i][j].setColor(Color.gray);
                 break;
         }
+    }
+
+    public boolean gameOver() {
+        return guess.equals(chosenWord) || round == 6;
     }
 }
